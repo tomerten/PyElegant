@@ -1,0 +1,32 @@
+SDDS1
+&description text="magnet layout for beamline /home/mti/tmp/sdds/fodo.lte" &end
+&column name=ElementName, type=string &end
+&column name=ElementType, type=string &end
+&column name=s, units=m, type=double &end
+&column name=Profile, type=double &end
+&data mode=ascii, no_row_counts=1 &end
+_BEGIN_ MARK 0 0
+"W1" WATCH 0.000000e+00  0
+"QF1" KQUAD 0.000000e+00  0
+"QF1" KQUAD 0.000000e+00  1
+"QF1" KQUAD 5.000000e-01  1
+"QF1" KQUAD 5.000000e-01  0
+"QF1" KQUAD 0.000000e+00 0
+"QF1" KQUAD 5.000000e-01 0
+"W2" WATCH 5.000000e-01  0
+"DL" DRIF 5.000000e-01  0
+"DL" DRIF 2.000000e+00  0
+"QD1" KQUAD 2.000000e+00  0
+"QD1" KQUAD 2.000000e+00  -1
+"QD1" KQUAD 4.500000e+00  -1
+"QD1" KQUAD 4.500000e+00  0
+"QD1" KQUAD 2.000000e+00 0
+"QD1" KQUAD 4.500000e+00 0
+"DL" DRIF 4.500000e+00  0
+"DL" DRIF 6.000000e+00  0
+"QF2" KQUAD 6.000000e+00  0
+"QF2" KQUAD 6.000000e+00  1
+"QF2" KQUAD 6.500000e+00  1
+"QF2" KQUAD 6.500000e+00  0
+"QF2" KQUAD 6.000000e+00 0
+"QF2" KQUAD 6.500000e+00 0
