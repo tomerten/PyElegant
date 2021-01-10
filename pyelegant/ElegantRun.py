@@ -5,9 +5,11 @@ from io import StringIO
 
 import numpy as np
 import pandas as pd
+from scipy import constants as const
 
 from .ElegantCommand import ElegantCommandFile
 from .SDDSTools.SDDS import SDDS
+from .SDDSTools.Utils import GenerateNDimCoordinateGrid
 
 
 class ElegantRun:
@@ -32,6 +34,25 @@ class ElegantRun:
             for r in self._REQUIRED_KWARGS:
                 print(r)
 
+    def _write_parallel_script(self):
+        bashstrlist = [
+            "n_cores=`grep processor /proc/cpuinfo | wc -l`",
+            "echo The system has $n_cores cores.",
+            "n_proc=$((n_cores-1))",
+            "echo $n_proc processes will be started.",
+            "if [ ! -e ~/.mpd.conf ]; then",
+            '  echo "MPD_SECRETWORD=secretword" > ~/.mpd.conf',
+            "  chmod 600 ~/.mpd.conf",
+            "fi",
+            "mpiexec -host $HOSTNAME -n $n_proc Pelegant  $1 $2 $3 $4 $5 $6 $7 $8 $9",
+        ]
+        bashstr = "\n".join(bashstrlist)
+
+        with open("temp_run_pelegant.sh", "w") as f:
+            f.write(bashstrlist)
+
+        self.pelegant = "temp_run_pelegant.sh"
+
     def run(self, parallel=False):
         """
         Run the commandfile.
@@ -41,11 +62,12 @@ class ElegantRun:
         parallel    : Bool
             run serial or parallel Elegant
         """
+        # check if commandfile is not empty
         if len(self.commandfile.commandlist) == 0:
             print("Commandfile empty - nothing to do.")
             return
 
-        # check if commandfile is not empty
+        # write file
         self.commandfile.write()
 
         # set cmdstr
@@ -229,22 +251,99 @@ class ElegantRun:
 
         return C, R, ElementMatrices, T_dict, Q_dict
 
-    def simple_single_particle_track(self, coord=np.zeros((6, 1)), **kwargs):
+    def generate_sdds_particle_inputfile(self, **kwargs):
+        """
+        Generates an SDDS file containing initial
+        particle coordinates on a grid. The grid
+        can be defined through the kwargs.
+
+        Arguments:
+        ----------
+        kwargs      :
+            - pmin: min value of grid on each dim
+            - pmax: max value of grid on each dim
+            - pcentralmev: particle energy (code converts it to beta * gamma )
+            - man_ranges: dict containing as key dim num - in order x xp y yp s p
+                          and as values an array of values to be used
+                          For p this is autoset to beta gamma based on pcentralmev
+            - NPOINTS: number of linear spaced points in each dim for the grid
+
+        Returns:
+        --------
+        None, writes the data to pre-defined named file.
+
+        """
+        npoints_per_dim = kwargs.get("NPOINTS", 2)
+        pmin = kwargs.get("pmin", 0)
+        pmax = kwargs.get("pmax", 1e-4)
+        pcentral = kwargs.get("pcentralmev", 1700.00)
+        # convert to beta * gamma
+        pcentral = np.sqrt(
+            (pcentral / const.physical_constants["electron mass energy equivalent in MeV"][0]) ** 2
+            - 1
+        )
+        man_ranges = kwargs.get("man_ranges", {"5": np.array([pcentral])})
+        if "5" not in man_ranges.keys():
+            man_ranges["5"] = np.array([pcentral])
+        # example : man_ranges={'0':np.array([1e-6,1e-5]),'1':[0]})
+
+        # generate coordinate grid, with particle id as last column
+        particle_arr = GenerateNDimCoordinateGrid(
+            6, npoints_per_dim, pmin=pmin, pmax=pmax, man_ranges=man_ranges
+        )
+
+        # generate header of SDDS file
+        sddsstr = """"""
+        sddsstr += "SDDS1\n"
+        sddsstr += "&column name=x, units=m, type=double,  &end\n"
+        sddsstr += "&column name=xp, type=double,  &end\n"
+        sddsstr += "&column name=y, units=m, type=double,  &end\n"
+        sddsstr += "&column name=yp, type=double,  &end\n"
+        sddsstr += "&column name=t, units=s, type=double,  &end\n"
+        sddsstr += '&column name=p, units="m$be$nc", type=double,  &end\n'
+        sddsstr += "&column name=particleID, type=long,  &end\n"
+        sddsstr += "&data mode=ascii, &end\n"
+        sddsstr += "! page number 1\n"
+        sddsstr += "{:>14}\n".format(particle_arr.shape[0])
+
+        # write to file and add particle coordinates
+        with open("temp_particles_input.txt", "w") as f:
+            f.write(sddsstr)
+            for row in particle_arr:
+                np.savetxt(f, row.reshape(1, 7), fmt="%6e %6e %6e %6e %6e %12e %d")
+
+        self.sdds_beam_file = "temp_particles_input.txt"
+
+    def simple_single_particle_track(self, coord=np.zeros((5, 1)), **kwargs):
         """
         Track a single particle with given initial coordinates.
+
+        Important:
+        ----------
+        Be careful with giving the 6th coordinate, this is beta * gamma. If not
+        given it will be calculated automatically either using standard 1700 MeV
+        or kwargs["pcentralmev"].
+
         """
+        # generate particle input file
+        self.generate_sdds_particle_inputfile(
+            man_ranges={k: v for k, v in zip(range(coord.shape[0] + 1), coord)}, **kwargs
+        )
+
+        # construct command file
         self.commandfile.clear()
         self.add_basic_setup()
         self.commandfile.addCommand("run_control", n_passes=kwargs.get("n_passes", 2 ** 8))
         self.commandfile.addCommand("bunched_beam")
+        self.commandfile.addCommand(
+            "sdds_beam",
+            input=self.sdds_beam_file,
+            input_type='"elegant"',
+        )
+        self.commandfile.addCommand("track")
 
-    def generate_particle_lattice(self):
-        """
-        Generate a lattice of particle coordinates,
-        based on boundaries and number of points per
-        dimension.
-        """
-        pass
+        # run will write command file and execute it
+        self.run()
 
     def manual_vary_input_table(self):
         """
@@ -285,3 +384,34 @@ class ElegantRun:
         """
         Run Elegant's Dynamic Momentum Aperture.
         """
+        pass
+
+    def table_scan(self, scan_list_of_dicts, **kwargs):
+        """"""
+        self.commandfile.clear()
+        self.add_basic_setup()
+        self.commandfile.addCommand(
+            "run_control",
+            n_passes=kwargs.get("n_passes", 2 ** 8),
+            n_indices=len(scan_list_of_dicts),
+        )
+        for i, l in enumerate(scan_list_of_dicts):
+            self.commandfile.addCommand(
+                "vary_element",
+                naem=l.get("name"),
+                item=l.get("item"),
+                initial=l.get("initial"),
+                final=l.get("final"),
+                index_number=i,
+                index_limit=l.get("index_limit"),
+            )
+
+        self.commandfile.addCommand(
+            "sdds_beam",
+            input=self.sdds_beam_file,
+            input_type='"elegant"',
+        )
+        self.commandfile.addCommand("track")
+
+        # run will write command file and execute it
+        self.run()

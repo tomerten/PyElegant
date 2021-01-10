@@ -28,14 +28,15 @@ def GenerateNDimCoordinateGrid(N, NPOINTS, pmin=1e-6, pmax=1e-4, man_ranges=None
     """
     rangelist = [np.linspace(pmin, pmax, NPOINTS)] * N
     if man_ranges is not None:
+        print(man_ranges)
         for k, v in man_ranges.items():
             rangelist[int(k)] = v
+        print(rangelist)
     grid = np.meshgrid(*rangelist)
     coordinate_grid = np.array([*grid])
-    coordinate_grid = coordinate_grid.reshape(N, coordinate_grid.size // N).T
-    print(
-        "Shape: {} - Number of paritcles: {} ".format(
-            coordinate_grid.shape, coordinate_grid.size // N
-        )
-    )
+    npart = coordinate_grid.size // N
+    coordinate_grid = coordinate_grid.reshape(N, npart).T
+    print("Shape: {} - Number of paritcles: {} ".format(coordinate_grid.shape, npart))
+    # add particle id
+    coordinate_grid = np.hstack((coordinate_grid, np.array(range(1, npart + 1)).reshape(npart, 1)))
     return coordinate_grid

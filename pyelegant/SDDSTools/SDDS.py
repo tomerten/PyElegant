@@ -3,11 +3,11 @@ import shlex
 import subprocess as subp
 from io import StringIO
 
+import numpy as np
 import pandas as pd
 from dask import dataframe as dd
 
 from .SDDSTools import sddsconvert2ascii, sddsconvert2binary
-from .Utils import GenerateNDimCoordinateGrid
 
 
 class SDDS:
@@ -15,7 +15,14 @@ class SDDS:
     Class for interacting with SDDS files.
     """
 
-    _COMMANDLIST = ["sddsconvert", "sddsquery", "sddsprocess", "sddsplot", "sddsprintout"]
+    _COMMANDLIST = [
+        "sddsconvert",
+        "sddsquery",
+        "sddsprocess",
+        "sddsplot",
+        "sddsprintout",
+        "sddsmakedataset",
+    ]
 
     def __init__(self, sif: str, filename: str, filetype: int):
         self.sif = sif
@@ -205,7 +212,9 @@ class SDDS:
         self.addCommand(
             "sddsprocess",
             define="column,step,Step {}".format(self.filename),
-            outfile="{}_processed.{}".format(self.filename.split(".")),
+            outfile="{}_processed.{}".format(
+                self.filename.split(".")[0], self.filename.split(".")[1]
+            ),
         )
         self.runCommand()
 
@@ -320,7 +329,7 @@ class SDDS:
 
         return data
 
-    def sddsplot_with_(self, **kwargs):
+    def sddsplot_with_string(self, **kwargs):
         self.addCommand("sddsplot", string=kwargs.get("string", "-col=s,x"))
 
     def sddsplot(
@@ -341,51 +350,27 @@ class SDDS:
         else:
             strfill = ""
         # TODO extra options
-        extra = " ".join(["-{}={}".format(k, v) for k, v in kwargs.items()])
+        # extra = " ".join(["-{}={}".format(k, v) for k, v in kwargs.items()])
         cmd = f"{self.sif} sddsplot -columnNames={','.join(columnNames)} {self.filename} "
         cmd += f"-graph={markerstyle},vary={vary}{strfill},scale={str(scalemarker)} -order={order} -split={split} -scale={scale}"
         subp.run(cmd, check=True, shell=True)
 
-    def generate_particle_lattice(self, **kwargs):
-        # TODO manranges and pmin and pmax
-        man_ranges={'0':np.array([1e-6,1e-5]),'1':[0]})
-        particle_arr = GenerateNDimCoordinateGrid(6, kwargs.get("NPOINTS",2), kwargs.get(man_ranges))
-        sddsstr = """"""
-        sddsstr += "SDDS1\n"
-        sddsstr += "&column name=x, units=m, type=double,  &end\n"
-        sddsstr += "&column name=xp, units=rad, type=double,  &end\n"
-        sddsstr += "&column name=y, units=m, type=double,  &end\n"
-        sddsstr += "&column name=yp, units=rad, type=double,  &end\n"
-        sddsstr += "&column name=t, units=s, type=double,  &end\n"
-        sddsstr += "&column name=p, units=\"m$be$nc\", type=double,  &end\n"
-        sddsstr += "&column name=particleID, type=long,  &end\n"
-        sddsstr += "&data mode=ascii, &end\n"
-        sddsstr += "! page number 1"
-        sddsstr += "{:14}".format()
-        "             1"
-
-
-    def generate_scan_dataset(self, datasetdict, filepath):
+    def generate_scan_dataset(self, datasetdict):
         """
-        Generates a file called "scan.sdds" containing columns of values
+        Generates a file called "temp_scan.sdds" containing columns of values
         to be used by elegant to scan over using vary_element method.
 
-        Parameters:
+        Arguments:
+        ----------
         datadict: dict
             dictionary where the keys are the column headers and values are list of values to scan over
             Note: all dict values need to have the same length
 
-        filepath: str
-            path where the simulation will be run (i.e where ele and lte files are)
         """
-        currdir = os.getcwd()
-        os.chdir(filepath)
-        print(filepath)
-        cmd = f"{sif}  sddsmakedataset scan.sdds "
+        cmd = f"{self.sif}  sddsmakedataset temp_scan.sdds "
 
         for k, v in datasetdict.items():
             cmd += f"-column={k},type=double -data=" + ",".join([str(vv) for vv in v]) + " "
 
-        subprocess.run(cmd, check=True, shell=True)
-
-        os.chdir(currdir)
+        subp.run(cmd, check=True, shell=True)
+        self.sdds_scan = "temp_scan.sdds"
