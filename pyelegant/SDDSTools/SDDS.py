@@ -7,6 +7,7 @@ import pandas as pd
 from dask import dataframe as dd
 
 from .SDDSTools import sddsconvert2ascii, sddsconvert2binary
+from .Utils import GenerateNDimCoordinateGrid
 
 
 class SDDS:
@@ -344,6 +345,25 @@ class SDDS:
         cmd = f"{self.sif} sddsplot -columnNames={','.join(columnNames)} {self.filename} "
         cmd += f"-graph={markerstyle},vary={vary}{strfill},scale={str(scalemarker)} -order={order} -split={split} -scale={scale}"
         subp.run(cmd, check=True, shell=True)
+
+    def generate_particle_lattice(self, **kwargs):
+        # TODO manranges and pmin and pmax
+        man_ranges={'0':np.array([1e-6,1e-5]),'1':[0]})
+        particle_arr = GenerateNDimCoordinateGrid(6, kwargs.get("NPOINTS",2), kwargs.get(man_ranges))
+        sddsstr = """"""
+        sddsstr += "SDDS1\n"
+        sddsstr += "&column name=x, units=m, type=double,  &end\n"
+        sddsstr += "&column name=xp, units=rad, type=double,  &end\n"
+        sddsstr += "&column name=y, units=m, type=double,  &end\n"
+        sddsstr += "&column name=yp, units=rad, type=double,  &end\n"
+        sddsstr += "&column name=t, units=s, type=double,  &end\n"
+        sddsstr += "&column name=p, units=\"m$be$nc\", type=double,  &end\n"
+        sddsstr += "&column name=particleID, type=long,  &end\n"
+        sddsstr += "&data mode=ascii, &end\n"
+        sddsstr += "! page number 1"
+        sddsstr += "{:14}".format()
+        "             1"
+
 
     def generate_scan_dataset(self, datasetdict, filepath):
         """
