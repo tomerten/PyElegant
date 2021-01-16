@@ -4,9 +4,9 @@ SDDS1
 &column name=y, units=m, type=double,  &end
 &column name=yp, type=double,  &end
 &column name=t, units=s, type=double,  &end
-&column name=p, units="m$be$nc", type=double,  &end
+&column name=p, units=m, type=double,  &end
 &column name=particleID, type=long,  &end
 &data mode=ascii, &end
 ! page number 1
-             1
-0.000000e+00 0.000000e+00 0.000000e+00 0.000000e+00 0.000000e+00 3.326817e+03 1
+                   1
+ 0.000000000000000e+00  0.000000000000000e+00  0.000000000000000e+00  0.000000000000000e+00  0.000000000000000e+00  3.326816861756800e+03 1 

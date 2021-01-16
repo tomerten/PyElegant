@@ -19,7 +19,7 @@
 &end
 
 &sdds_beam
-	input               = temp_particles_input.txt,
+	input               = temp_particles_input.bin,
 	input_type          = "elegant",
 &end
 

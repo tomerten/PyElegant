@@ -86,7 +86,7 @@ class ElegantCommandFile:
         that can be added to the command file.
 
         Arguments:
-        ---------- 
+        ----------
         command     : str
             valid Elegant command
         note        :
@@ -114,7 +114,7 @@ class ElegantCommandFile:
     def modifyCommand(self, commandname, mode="last", **params):
         """
         Method to modify a command already in the command list.
-        If the command is used multiple times, the command you 
+        If the command is used multiple times, the command you
         want to change can be select by using the strings "first" or "last"
         or by giving the integer index of the command.
 
@@ -172,14 +172,14 @@ class ElegantCommandFile:
         Method to repeat a commend already in the
         command list.
 
-                
+
         Arguments:
         ----------
         commandname     : str
             name of the command to modify
         mode            : str
             if multiple commands select which one to change
-        
+
         """
         # create index list for the command to be repeated
         indlist = []
@@ -210,7 +210,8 @@ class ElegantCommandFile:
         self.commandlist = []
 
     def optimize(
-        self, lattice,
+        self,
+        lattice,
     ):
         pass
 

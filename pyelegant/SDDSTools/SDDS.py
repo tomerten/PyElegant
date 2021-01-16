@@ -2,6 +2,7 @@ import os
 import shlex
 import subprocess as subp
 from io import StringIO
+from typing import Dict, List
 
 import numpy as np
 import pandas as pd
@@ -10,35 +11,53 @@ from dask import dataframe as dd
 from .SDDSTools import sddsconvert2ascii, sddsconvert2binary
 
 
-class SDDS:
-    """
-    Class for interacting with SDDS files.
-    """
-
+class SDDSCommand:
     _COMMANDLIST = [
+        "plaindata2sdds",
+        "sdds2stream",
         "sddsconvert",
         "sddsquery",
         "sddsprocess",
         "sddsplot",
         "sddsprintout",
         "sddsmakedataset",
+        "sddsnaff",
     ]
 
-    def __init__(self, sif: str, filename: str, filetype: int):
+    def __init__(self, sif):
         self.sif = sif
-        self.filetype = filetype
-        self._filename = filename
-        self.columnlist = None
-        self.commandlist = []
-        self.command_history = {}
+        self.command = {}
 
-    @property
-    def filename(self):
-        return self._filename
+    def createCommand(self, command, note="", **params):
+        """
+        Method to add a command to the command file.
+        Generates a dict to reconstruct command string,
+        that can be added to the command file.
 
-    @filename.setter
-    def filename(self, value):
-        self._filename = value
+        Arguments:
+        ----------
+        command     : str
+            valid Elegant command
+        note        :
+
+        params      :
+
+        """
+        # check if it is a valid Elegant command
+        if self.checkCommand(command) == False:
+            print("The command {} is not recognized.".format(command))
+            return
+
+        # init command dict
+        thiscom = {}
+        thiscom["NAME"] = command
+
+        # add command parameters to the command dict
+        for k, v in params.items():
+            thiscom[k] = v
+
+        # add the command dict to the command list
+        self.command = thiscom
 
     def checkCommand(self, typename):
         """
@@ -56,88 +75,144 @@ class SDDS:
                 return True
         return False
 
-    def addCommand(self, command, note="", **params):
+    def clearCommand(self):
+        """
+        Clear the command list.
+
+        """
+        self.command = {}
+
+    def getCommand(self, command, **params):
+        self.createCommand(command, **params)
+        cmdstr = "{} {}".format(self.sif, self.command["NAME"])
+
+        for k, v in params.items():
+            if "file" in k.lower():
+                cmdstr += " {}".format(v)
+            elif "separator" in k.lower():
+                cmdstr += ' "-separator= {}"'.format(v)
+            else:
+                if v is not None:
+                    cmdstr += " -{}={}".format(k.split("_")[0], v)
+                else:
+                    cmdstr += " -{}".format(k.split("_")[0])
+
+        return cmdstr
+
+    def runCommand(self, commandstring):
+        print("Running command {}".format(commandstring))
+        subp.run(commandstring, check=True, shell=True)
+
+    def get_particles_plain_2_SDDS_command(self, **params):
+        """
+        Returns sdds command to turn plain data table, separated
+        by a space into SDDS particle initial coordinates SDDS file.
+        Easy to generate plain data with pandas.
+
+        Example:
+            pd.DataFrame([
+            {
+                'x':0.000,
+                'px':1.
+            },
+             {
+                'x':5.000,
+                'px':1.
+            }
+            ]).to_csv('testplain.dat',sep=' ',header=None, index=False)
+
+        Arguments:
+        ----------
+        kwargs      :
+            - outputMode: set ascii for serial elegant and binary for Pelegant
+
+        """
+        return self.getCommand(
+            "plaindata2sdds",
+            file_1=params.get("file_1", "temp_plain_particles.dat"),
+            file_2=params.get("file_2", "temp_particles_input.txt"),
+            inputMode=params.get("inputMode", "ascii"),
+            outputMode=params.get("outputMode", "ascii"),
+            separator=" ",
+            column_1="x,double,units=m",
+            column_2="xp,double",
+            column_3="y,double,units=m",
+            column_4="yp,double",
+            column_5="t,double,units=s",
+            column_6='p,double,units="m$be$nc"',
+            columns_7="particleID,long",
+            noRowCount=None,
+        )
+
+
+class SDDS:
+    """
+    Class for interacting with SDDS files.
+    """
+
+    def __init__(self, sif: str, filename: str, filetype: int):
+        self.sif = sif
+        self.filetype = filetype
+        self._filename = filename
+        self.columnlist = None
+        self.commandlist = []
+        self.command_history = {}
+
+    @property
+    def filename(self):
+        return self._filename
+
+    @filename.setter
+    def filename(self, value):
+        self._filename = value
+
+    def addCommand(self, command, **params):
         """
         Method to add a command to the command file.
-        Generates a dict to reconstruct command string,
-        that can be added to the command file.
 
         Arguments:
         ----------
         command     : str
             valid Elegant command
-        note        :
-
         params      :
 
-            - outfile : if one wants output to outputfile
-            - infile : if one needs inputfile
         """
-        # check if it is a valid Elegant command
-        if self.checkCommand(command) == False:
-            print("The command {} is not recognized.".format(command))
-            return
+        sddscommand = SDDSCommand(self.sif)
+        cmdstr = sddscommand.getCommand(command, **params)
 
-        # init command dict
-        thiscom = {}
-        thiscom["NAME"] = command
+        # add command to current commandlist
+        self.commandlist.append(cmdstr)
 
-        # add command parameters to the command dict
-        for k, v in params.items():
-            thiscom[k] = v
+    def clearCommandList(self):
+        """
+        Clear the command list.
 
-        # add the command dict to the command list
-        self.commandlist.append(thiscom)
-
-    def clearCommand(self):
-        self.commandlist = []
+        """
+        self.commandlist = {}
 
     def clearHistory(self):
+        """
+        Clear command history.
+        """
         self.command_history = {}
 
     def _addHistory(self, cmdstr):
-        # add commands to history
+        """
+        Add commands to history.
+        """
         _key = str(len(self.command_history))
         _value = cmdstr
         self.command_history[_key] = _value
 
     def runCommand(self):
         """
-        Method to write the command file to string and out
-
+        Run all the sddscommands in the command list.
         """
-        # writing the command string
-        # looping over the commands
-        cmdstrlist = []
-        for command in range(len(self.commandlist)):
-            cmdstr = self.commandlist[command]["NAME"]
+        if len(self.commandlist) > 0:
+            for cmd in range(len(self.commandlist)):
+                # add commands to history
+                self._addHistory(cmd)
 
-            for k, v in self.commandlist[command].items():
-                if k != "NAME":
-                    if "string" in k.lower():
-                        cmdstr += "\t{}".format(v)
-                    # sometimes a plot can be constructed
-                    # from multiple files
-                    elif "outfile" in k.lower():
-                        cmdstr += "\t{}".format(v)
-                    elif "infile" in k.lower():
-                        cmdstr += "\t{}".format(v)
-                    else:
-                        if v is not None:
-                            cmdstr += "\t-{}={}".format(k, v)
-                        else:
-                            cmdstr += "\t-{}".format(k)
-
-            cmdstrlist.append(cmdstr)
-
-            # add commands to history
-            self._addHistory(cmdstr)
-
-        if len(cmdstrlist) > 0:
-            # execute command list
-            for cmd in cmdstrlist:
-                # add sif
-                cmd = "{} {}".format(self.sif, cmd)
                 # run command
                 print("Executing : \n{}".format(cmd))
 
@@ -148,7 +223,7 @@ class SDDS:
         else:
             print("No commands entered - nothing to do!")
 
-        self.clearCommand()
+        self.clearCommandList()
 
     def runHistory(self, output=False):
         """
@@ -331,6 +406,11 @@ class SDDS:
 
     def sddsplot_with_string(self, **kwargs):
         self.addCommand("sddsplot", string=kwargs.get("string", "-col=s,x"))
+
+    def sddsplot_base(self, **kwargs):
+        sddscommand = SDDSCommand(self.sif)
+        cmd = sddscommand.getCommand("sddsplot", **kwargs)
+        sddscommand.runCommand(cmd)
 
     def sddsplot(
         self,

@@ -8,11 +8,65 @@ import pandas as pd
 from scipy import constants as const
 
 from .ElegantCommand import ElegantCommandFile
-from .SDDSTools.SDDS import SDDS
+from .SDDSTools.SDDS import SDDS, SDDSCommand
 from .SDDSTools.Utils import GenerateNDimCoordinateGrid
 
 
+def write_parallel_elegant_script():
+    """
+    Method to generate a script that runs
+    pelegant from bash.
+    """
+
+    # list of strings to write
+    bashstrlist = [
+        "#!/usr/bin/env bash",
+        "if [ $# == 0 ] ; then",
+        '   echo "usage: run_Pelegant <inputfile>"',
+        "   exit 1",
+        "fi",
+        "n_cores=`grep processor /proc/cpuinfo | wc -l`",
+        "echo The system has $n_cores cores.",
+        "n_proc=$((n_cores-1))",
+        "echo $n_proc processes will be started.",
+        "if [ ! -e ~/.mpd.conf ]; then",
+        '  echo "MPD_SECRETWORD=secretword" > ~/.mpd.conf',
+        "  chmod 600 ~/.mpd.conf",
+        "fi",
+        "mpiexec -host $HOSTNAME -n $n_proc Pelegant  $1 $2 $3 $4 $5 $6 $7 $8 $9",
+    ]
+
+    bashstr = "\n".join(bashstrlist)
+
+    # write to file
+    with open("temp_run_pelegant.sh", "w") as f:
+        f.write(bashstr)
+
+
+def write_parallel_run_script(sif):
+    """
+    Method to generate parallel elegant run
+    script.
+    """
+    bashstrlist = [
+        "#!/bin/bash",
+        "pele={}".format(sif),
+        'cmd="bash temp_run_pelegant.sh"',
+        "",
+        "$pele $cmd $1",
+    ]
+    bashstr = "\n".join(bashstrlist)
+
+    # write to file
+    with open("run_pelegant.sh", "w") as f:
+        f.write(bashstr)
+
+
 class ElegantRun:
+    """
+    Class to interact with Elegant and Parallel Elegant from Python.
+    """
+
     _REQUIRED_KWARGS = ["use_beamline", "energy"]
 
     def __init__(self, sif, lattice: str, parallel=False, **kwargs):
@@ -22,6 +76,13 @@ class ElegantRun:
         self.kwargs = kwargs
         self.check()
         self.commandfile = ElegantCommandFile("temp.ele")
+
+        # setting up executable
+        if parallel:
+            self._write_parallel_script()
+            self.exec = "bash {}".format(self.pelegant)
+        else:
+            self.exec = "{} elegant ".format(self.sif)
 
     def check(self):
         """
@@ -35,46 +96,30 @@ class ElegantRun:
                 print(r)
 
     def _write_parallel_script(self):
-        bashstrlist = [
-            "n_cores=`grep processor /proc/cpuinfo | wc -l`",
-            "echo The system has $n_cores cores.",
-            "n_proc=$((n_cores-1))",
-            "echo $n_proc processes will be started.",
-            "if [ ! -e ~/.mpd.conf ]; then",
-            '  echo "MPD_SECRETWORD=secretword" > ~/.mpd.conf',
-            "  chmod 600 ~/.mpd.conf",
-            "fi",
-            "mpiexec -host $HOSTNAME -n $n_proc Pelegant  $1 $2 $3 $4 $5 $6 $7 $8 $9",
-        ]
-        bashstr = "\n".join(bashstrlist)
+        """
+        Generate the script to run parallel elegant.
+        Method sets self.pelegant to the script file.
+        """
+        write_parallel_elegant_script()
+        write_parallel_run_script(self.sif)
+        self.pelegant = "run_pelegant.sh"
 
-        with open("temp_run_pelegant.sh", "w") as f:
-            f.write(bashstrlist)
-
-        self.pelegant = "temp_run_pelegant.sh"
-
-    def run(self, parallel=False):
+    def run(self):
         """
         Run the commandfile.
-
-        Arguments:
-        ----------
-        parallel    : Bool
-            run serial or parallel Elegant
         """
         # check if commandfile is not empty
         if len(self.commandfile.commandlist) == 0:
             print("Commandfile empty - nothing to do.")
             return
 
-        # write file
+        # write Elegant command file to disk
         self.commandfile.write()
 
-        # set cmdstr
-        if parallel:
-            pass
-        else:
-            cmdstr = "{} elegant temp.ele".format(self.sif)
+        # generate command string
+        print(self.exec)
+        cmdstr = "{} temp.ele".format(self.exec)
+        print(cmdstr)
 
         # run
         with open(os.devnull, "w") as f:
@@ -96,7 +141,7 @@ class ElegantRun:
             rootname="temp",
             parameters="%s.params",
             semaphore_file="%s.done",
-            magnets="%s.mag",
+            magnets="%s.mag",  # for plotting profile
         )
 
     def add_basic_controls(self):
@@ -125,16 +170,7 @@ class ElegantRun:
         self.commandfile.clear()
 
         # add setup command
-        self.commandfile.addCommand(
-            "run_setup",
-            lattice=self.lattice,
-            use_beamline=self.kwargs.get("use_beamline", None),
-            rootname="temp",
-            p_central_mev=self.kwargs.get("energy"),
-            centroid="%s.cen",
-            default_order=3,
-            concat_order=3,
-        )
+        self.add_basic_setup
 
         # add twiss calc
         self.commandfile.addCommand(
@@ -146,9 +182,7 @@ class ElegantRun:
         )
 
         # add controls
-        self.commandfile.addCommand("run_control")
-        self.commandfile.addCommand("bunched_beam")
-        self.commandfile.addCommand("track")
+        self.add_basic_controls()
 
         # write command file
         self.commandfile.write()
@@ -288,31 +322,41 @@ class ElegantRun:
         # example : man_ranges={'0':np.array([1e-6,1e-5]),'1':[0]})
 
         # generate coordinate grid, with particle id as last column
-        particle_arr = GenerateNDimCoordinateGrid(
-            6, npoints_per_dim, pmin=pmin, pmax=pmax, man_ranges=man_ranges
+        # and save it as plain data table seperated by a whitespace
+        particle_df = pd.DataFrame(
+            GenerateNDimCoordinateGrid(
+                6, npoints_per_dim, pmin=pmin, pmax=pmax, man_ranges=man_ranges
+            )
+        )
+        particle_df.to_csv("temp_plain_particles.dat", sep=" ", header=None, index=False)
+
+        # cleanup kwargs
+        kwargs.pop("NPOINTS", None)
+        kwargs.pop("pmin", None)
+        kwargs.pop("pmax", None)
+        kwargs.pop("pcentralmev", None)
+        kwargs.pop("man_ranges", None)
+
+        # Create sddscommand object
+        sddscommand = SDDSCommand(self.sif)
+
+        # update the command parameters
+        if self.parallel:
+            outputmode = "binary"
+        else:
+            outputmode = "ascii"
+        kwargs["outputMode"] = outputmode
+        kwargs["file_2"] = (
+            "temp_particles_input.txt" if not self.parallel else "temp_particles_input.bin"
         )
 
-        # generate header of SDDS file
-        sddsstr = """"""
-        sddsstr += "SDDS1\n"
-        sddsstr += "&column name=x, units=m, type=double,  &end\n"
-        sddsstr += "&column name=xp, type=double,  &end\n"
-        sddsstr += "&column name=y, units=m, type=double,  &end\n"
-        sddsstr += "&column name=yp, type=double,  &end\n"
-        sddsstr += "&column name=t, units=s, type=double,  &end\n"
-        sddsstr += '&column name=p, units="m$be$nc", type=double,  &end\n'
-        sddsstr += "&column name=particleID, type=long,  &end\n"
-        sddsstr += "&data mode=ascii, &end\n"
-        sddsstr += "! page number 1\n"
-        sddsstr += "{:>14}\n".format(particle_arr.shape[0])
+        # load the pre-defined  convert plain data to sdds command
+        cmd = sddscommand.get_particles_plain_2_SDDS_command(**kwargs)
 
-        # write to file and add particle coordinates
-        with open("temp_particles_input.txt", "w") as f:
-            f.write(sddsstr)
-            for row in particle_arr:
-                np.savetxt(f, row.reshape(1, 7), fmt="%6e %6e %6e %6e %6e %12e %d")
+        # run the sdds command
+        sddscommand.runCommand(cmd)
 
-        self.sdds_beam_file = "temp_particles_input.txt"
+        self.sdds_beam_file = kwargs["file_2"]
 
     def simple_single_particle_track(self, coord=np.zeros((5, 1)), **kwargs):
         """
@@ -352,14 +396,24 @@ class ElegantRun:
         """
         pass
 
-    def track_simple(self):
+    def track_simple(self, **kwargs):
         """
         Track a set of particles.
         """
-        if self.parallel:
-            pass
-        else:
-            pass
+        # construct command file
+        self.commandfile.clear()
+        self.add_basic_setup()
+        self.commandfile.addCommand("run_control", n_passes=kwargs.get("n_passes", 2 ** 8))
+        self.commandfile.addCommand("bunched_beam")
+        self.commandfile.addCommand(
+            "sdds_beam",
+            input=self.sdds_beam_file,
+            input_type='"elegant"',
+        )
+        self.commandfile.addCommand("track")
+
+        # run will write command file and execute it
+        self.run()
 
     def track_vary(self):
         """

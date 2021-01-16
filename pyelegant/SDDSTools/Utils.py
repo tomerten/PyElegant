@@ -28,10 +28,10 @@ def GenerateNDimCoordinateGrid(N, NPOINTS, pmin=1e-6, pmax=1e-4, man_ranges=None
     """
     rangelist = [np.linspace(pmin, pmax, NPOINTS)] * N
     if man_ranges is not None:
-        print(man_ranges)
+        # print(man_ranges)
         for k, v in man_ranges.items():
             rangelist[int(k)] = v
-        print(rangelist)
+            # print(rangelist)
     grid = np.meshgrid(*rangelist)
     coordinate_grid = np.array([*grid])
     npart = coordinate_grid.size // N
