@@ -355,6 +355,9 @@ class SDDS:
                 self.filename,
                 self.filename + "_columnvalues.dat",
             )
+            p = subp.Popen(cmdstr, stdout=subp.PIPE, shell=True)
+            (output, err) = p.communicate()
+            p_status = p.wait()
             return self.filename + "_columnvalues.dat"
         else:
             cmdstr = "{} sdds2stream -col={} {}".format(

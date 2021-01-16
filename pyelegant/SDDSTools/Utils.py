@@ -39,4 +39,5 @@ def GenerateNDimCoordinateGrid(N, NPOINTS, pmin=1e-6, pmax=1e-4, man_ranges=None
     print("Shape: {} - Number of paritcles: {} ".format(coordinate_grid.shape, npart))
     # add particle id
     coordinate_grid = np.hstack((coordinate_grid, np.array(range(1, npart + 1)).reshape(npart, 1)))
+    # print(coordinate_grid)
     return coordinate_grid

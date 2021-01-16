@@ -170,7 +170,7 @@ class ElegantRun:
         self.commandfile.clear()
 
         # add setup command
-        self.add_basic_setup
+        self.add_basic_setup()
 
         # add twiss calc
         self.commandfile.addCommand(
@@ -317,7 +317,7 @@ class ElegantRun:
             - 1
         )
         man_ranges = kwargs.get("man_ranges", {"5": np.array([pcentral])})
-        if "5" not in man_ranges.keys():
+        if "5" not in man_ranges.keys() and 5 not in man_ranges.keys():
             man_ranges["5"] = np.array([pcentral])
         # example : man_ranges={'0':np.array([1e-6,1e-5]),'1':[0]})
 
