@@ -1,8 +1,0 @@
-SDDS1
-&column name=x, units=m, type=double,  &end
-&column name=xp, type=double,  &end
-&data mode=ascii, &end
-! page number 1
-                   2
- 0.000000000000000e+00  1.000000000000000e+00 
- 5.000000000000000e+00  1.000000000000000e+00 

@@ -144,11 +144,101 @@ class ElegantRun:
             magnets="%s.mag",  # for plotting profile
         )
 
+    def add_basic_twiss(self):
+        """
+        Add basic twiss.
+        """
+        self.commandfile.addCommand(
+            "twiss_output", filename="%s.twi", matched=1, radiation_integrals=1
+        )
+
+    def add_vary_element(self, **kwargs):
+        """
+        Add single vary element line.
+        """
+        self.commandfile.addCommand(
+            "vary_element",
+            name=kwargs.get("name", "*"),
+            item=kwargs.get("item", "L"),
+            intial=kwargs.get("initial", 0.0000),
+            final=kwargs.get("final", 0.0000),
+            index_number=kwargs.get("index_number", 0),
+            index_limit=kwargs.get("index_limit", 1),
+        )
+
+    def add_very_element_from_file(self, **kwargs):
+        """
+        Add single vary element line, loading value from
+        dataset file.
+        """
+        if "enumeration_file" not in kwargs.keys():
+            print("External filename missing.")
+        else:
+            self.commandfile.addCommand(
+                "vary_element",
+                name=kwargs.get("name", "*"),
+                item=kwargs.get("item", "L"),
+                index_number=kwargs.get("index_number", 0),
+                index_limit=kwargs.get("index_limit", 1),
+                enumeration_file=kwargs.get("enumeration_file"),
+                enumeration_column=kwargs.get("enumeration_column"),
+            )
+
     def add_basic_controls(self):
         # add controls
         self.commandfile.addCommand("run_control")
         self.commandfile.addCommand("bunched_beam")
         self.commandfile.addCommand("track")
+
+    def add_fma_command(self, **kwargs):
+        """
+        Add elegant standard fma command.
+        """
+
+        self.commandfile.addCommand(
+            "frequency_map",
+            output="%s.fma",
+            xmin=kwargs.get("xmin", -0.1),
+            xmax=kwargs.get("xmax", 0.1),
+            ymin=kwargs.get("ymin", 1e-6),
+            ymax=kwargs.get("ymax", 0.1),
+            delta_min=kwargs.get("delta_min", 0),
+            delta_max=kwargs.get("delta_max", 0),
+            nx=kwargs.get("nx", 21),
+            ny=kwargs.get("ny", 21),
+            ndelta=kwargs.get("ndelta", 1),
+            verbosity=0,
+            include_changes=kwargs.get("include_changes", 1),
+            quadratic_spacing=kwargs.get("quadratic_spacing", 0),
+            full_grid_output=kwargs.get("full_grid_output", 1),
+        )
+
+    def add_DA_command(self, **kwargs):
+        """
+        Add DA find aperture command.
+        """
+        self.commandfile.addCommand(
+            "find_aperture",
+            output="%s.aper",
+            mode=kwargs.get("mode", "n-line"),
+            verbosity=0,
+            xmin=kwargs.get("xmin", -0.1),
+            xmax=kwargs.get("xmax", 0.1),
+            xpmin=kwargs.get("xpmin", 0.0),
+            xpmax=kwargs.get("xpmax", 0.0),
+            ymin=kwargs.get("ymin", 0.0),
+            ymax=kwargs.get("ymax", 0.1),
+            ypmin=kwargs.get("ypmin", 0.0),
+            ypmax=kwargs.get("ypmax", 0.0),
+            nx=kwargs.get("nx", 21),
+            ny=kwargs.get("ny", 11),
+            n_lines=kwargs.get("n_lines", 11),
+            split_fraction=kwargs.get("split_fraction", 0.5),
+            n_splits=kwargs.get("n_splits", 0),
+            desired_resolution=kwargs.get("desired_resolution", 0.01),
+            offset_by_orbit=kwargs.get("offset_by_orbit", 0),
+            full_plane=kwargs.get("full_plane", 1),
+        )
 
     def findtwiss(self, **kwargs):
         """
@@ -422,17 +512,30 @@ class ElegantRun:
         """
         pass
 
-    def fma(self):
+    def fma(self, **kwargs):
         """
         Run Elegant fma.
         """
-        pass
+        self.commandfile.clear()
+        self.add_basic_setup()
+        self.commandfile.addCommand("run_control", n_passes=kwargs.pop("n_passes", 2 ** 8))
+        self.add_basic_twiss()
+        self.add_fma_command(**kwargs)
 
-    def dynap(self):
+        self.run()
+
+    def dynap(self, **kwargs):
         """
         Run Elegant's Dynamic Aperture.
         """
-        pass
+        self.commandfile.clear()
+        self.add_basic_setup()
+
+        self.commandfile.addCommand("twiss_output", filename="%s.twi", output_at_each_step=1)
+        self.commandfile.addCommand("run_control", n_passes=kwargs.pop("n_passes", 2 ** 9))
+        self.add_DA_command(**kwargs)
+
+        self.run()
 
     def dynapmom(self):
         """

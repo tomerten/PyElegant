@@ -407,36 +407,44 @@ class SDDS:
 
         return data
 
-    def sddsplot_with_string(self, **kwargs):
-        self.addCommand("sddsplot", string=kwargs.get("string", "-col=s,x"))
-
     def sddsplot_base(self, **kwargs):
+        """
+        Basic sddsplot command
+        """
         sddscommand = SDDSCommand(self.sif)
         cmd = sddscommand.getCommand("sddsplot", **kwargs)
         sddscommand.runCommand(cmd)
 
     def sddsplot(
         self,
+        file=None,
         columnNames=["x", "xp"],
-        markerstyle="sym",
-        vary="subtype",
-        scalemarker=1,
-        fill=True,
-        order="spectral",
-        split="page",
         scale="0,0,0,0",
+        graph="sym,vary=subtype, fill",
+        order="spectral",
+        split="columnBin=particleID",
         **kwargs,
     ):
+        """
+        Quick standard multi particle tracking plotting
+        of phase space - add columnNames to plot other
+        variables.
+        Colors are assigned per particle ID.
+        """
+        if file is not None:
+            newkwargs = {
+                "file": file,
+                "columnNames": columnNames,
+                "scale": scale,
+                "graph": graph,
+                "order": order,
+                "split": split,
+            }
 
-        if fill:
-            strfill = ",fill"
+            newkwargs = {**newkwargs, **kwargs}
+            self.sddsplot_base(**newkwargs)
         else:
-            strfill = ""
-        # TODO extra options
-        # extra = " ".join(["-{}={}".format(k, v) for k, v in kwargs.items()])
-        cmd = f"{self.sif} sddsplot -columnNames={','.join(columnNames)} {self.filename} "
-        cmd += f"-graph={markerstyle},vary={vary}{strfill},scale={str(scalemarker)} -order={order} -split={split} -scale={scale}"
-        subp.run(cmd, check=True, shell=True)
+            print("File missing.")
 
     def generate_scan_dataset(self, datasetdict):
         """
@@ -448,6 +456,26 @@ class SDDS:
         datadict: dict
             dictionary where the keys are the column headers and values are list of values to scan over
             Note: all dict values need to have the same length
+        
+        Example:
+        --------
+        >>> datasetdc = {
+            "Q1" : [1.205055,1.555550505],
+            "Q2" : [-1.45000,-1.800000000],\
+            "Q3D": [-2.02000,-2.020000000],\
+            "Q4D": [1.408000,1.4080000000],\
+            "Q3T": [0.000000,0.0000000000],\
+            "Q4T": [0.000000,0.0000000000],\
+            "Q5T": [0.000000,0.0000000000],\
+            "S1" : [0.000000,0.0000000000],\
+            "S2" : [0.000000,0.0000000000],\
+            "S3D": [0.000000,0.0000000000],\
+            "S4D": [0.000000,0.0000000000],\
+            "S3T": [0.000000,0.0000000000],\
+            "S4T": [0.000000,0.0000000000]
+        }
+        >>> sdds = SDDS(sif, "temp.sdds",0)
+        >>> sdds.generate_scan_dataset(datasetdc)
 
         """
         cmd = f"{self.sif}  sddsmakedataset temp_scan.sdds "
