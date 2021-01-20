@@ -190,6 +190,29 @@ class ElegantRun:
         self.commandfile.addCommand("bunched_beam")
         self.commandfile.addCommand("track")
 
+    def add_watch(self, **kwargs):
+        self.commandfile.addCommand(
+            "insert_elements",
+            name=kwargs.get("name", ""),
+            type=kwargs.get("type", ""),
+            exclude="",
+            s_start=kwargs.get("s_start", -1),
+            s_end=kwargs.get("s_end", -1),
+            skip=kwargs.get("skip", 1),
+            insert_before=kwargs.get("insert_before", 0),
+            add_at_end=kwargs.get("add_at_end", 0),
+            add_at_start=kwargs.get("add_at_start", 0),
+            element_def=kwargs.get(
+                "element_def", 'WQ: WATCH, FILENAME="%s-%03ld.wq", mode=coordinates'
+            ),
+        )
+
+    def add_watch_at_start(self):
+        self.add_watch(
+            add_at_start=1,
+            element_def='W: WATCH, FILENAME="%s-%03ld.wq", mode=coordinates',
+        )
+
     def add_fma_command(self, **kwargs):
         """
         Add elegant standard fma command.
