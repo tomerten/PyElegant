@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "PyElegant"
-version = "0.1.0"
+version = "0.1.1"
 description = ""
 authors = ["Tom Mertens <tom.mertens@helmholtz-berlin.de>"]
 
@@ -18,5 +18,5 @@ black = "^20.8b1"
 pylint = "^2.6.0"
 
 [build-system]
-requires = ["poetry-core>=1.0.0"]
+requires = ["setuptools","poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
