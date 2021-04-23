@@ -1,3 +1,9 @@
+Installation:
+=============
+.. code-block:: bash
+
+   $ pip install -U git+https://github.com/tomerten/PyElegant.git
+
 Known issues
 ============
 
