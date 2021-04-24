@@ -458,7 +458,7 @@ def format_axes(ax):
 
 
 def PlotTrackingTSA(
-    data, nturns, npart, col="x", auto=True, vmax=250, vmin=-150, save=False, fn=None, **kwargs
+    pdata, nturns, npart, col="x", auto=True, vmax=250, vmin=-150, save=False, fn=None, **kwargs
 ):
     import matplotlib.ticker as ticker
 
