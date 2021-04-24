@@ -29,7 +29,7 @@ def ani(data, nmax, save=False, fn="test2.mp4"):
 
     intensity = []
     intensityp = []
-    iterations = len(sdata1)
+    iterations = len(data)
 
     # init frame steps
     t_vals = list(range(nmax))
