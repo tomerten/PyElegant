@@ -240,3 +240,132 @@ def make_movie(data6d, particleID, maxturn, save=False, filename="test.mp4", plo
 
     plt.tight_layout()
     plt.show()
+
+
+class ParticleAnimation6D:
+    """Class for 6D phase space and 2D transverse particle animation."""
+
+    def __init__(
+        self, data, nmax, xcol="x", pxcol="xp", ycol="y", pycol="yp", tcol="dt", deltacol="p"
+    ):
+        self.data = data.reset_index()
+        self.nmax = nmax
+
+        self.xcol = xcol
+        self.pxcol = pxcol
+        self.ycol = ycol
+        self.pycol = pycol
+        self.tcol = tcol
+        self.ptcol = deltacol
+
+        self.fig = plt.figure(figsize=(8, 8))
+        self.ax1 = plt.subplot2grid((2, 2), (0, 0), rowspan=1, colspan=1)
+        self.ax2 = plt.subplot2grid((2, 2), (0, 1), rowspan=1, colspan=1)
+        self.ax3 = plt.subplot2grid((2, 2), (1, 0), rowspan=1, colspan=1)
+        self.ax4 = plt.subplot2grid((2, 2), (1, 1), rowspan=1, colspan=1)
+
+        self.xmin = 1.1 * data[xcol].min()
+        self.pxmin = 1.1 * data[pxcol].min()
+        self.ymin = 1.1 * data[ycol].min()
+        self.pymin = 1.1 * data[pycol].min()
+        self.tmin = 1.1 * data[tcol].min()
+        self.ptmin = 1.1 * data[deltacol].min()
+
+        self.xmax = 1.1 * data[xcol].max()
+        self.pxmax = 1.1 * data[pxcol].max()
+        self.ymax = 1.1 * data[ycol].max()
+        self.pymax = 1.1 * data[pycol].max()
+        self.tmax = 1.1 * data[tcol].max()
+        self.ptmax = 1.1 * data[deltacol].max()
+
+        self.x = []
+        self.px = []
+        self.y = []
+        self.py = []
+        self.dt = []
+        self.pt = []
+
+        self.intensity = []
+        self.iterations = len(data)
+        self.t = list(range(nmax))
+
+    def _get_new_vals(self, t):
+        """
+        Method to get data
+        updates.
+        """
+        x = [self.data[self.xcol].iloc[t]]
+        px = [self.data[self.pxcol].iloc[t]]
+        y = [self.data[self.ycol].iloc[t]]
+        py = [self.data[self.pycol].iloc[t]]
+        dt = [self.data[self.tcol].iloc[t]]
+        p = [self.data[self.ptcol].iloc[t]]
+
+        return list(x), list(px), list(y), list(py), list(dt), list(p)
+
+    def animate(self, i):
+        self.ax1.set_title(f"Turn: {i:3}")
+        self.ax2.set_title(f"Turn: {i:3}")
+        self.ax3.set_title(f"Turn: {i:3}")
+        self.ax4.set_title(f"Turn: {i:3}")
+
+        # Get intermediate points
+        new_xvals, new_pxvals, new_yvals, new_pyvals, new_dtvals, new_pvals = self._get_new_vals(i)
+        self.x.extend(new_xvals)
+        self.px.extend(new_pxvals)
+        self.y.extend(new_yvals)
+        self.py.extend(new_pyvals)
+        self.dt.extend(new_dtvals)
+        self.pt.extend(new_pvals)
+
+        # Put new values in your plot
+        self.scatter1.set_offsets(np.c_[self.x, self.px])
+        self.scatter2.set_offsets(np.c_[self.y, self.py])
+        self.scatter3.set_offsets(np.c_[self.dt, self.pt])
+        self.scatter4.set_offsets(np.c_[self.x, self.y])
+
+        # calculate new color values
+        self.intensity = np.concatenate((np.array(self.intensity) * 0.99, np.ones(1)))
+
+        self.scatter1.set_array(self.intensity)
+        self.scatter2.set_array(self.intensity)
+        self.scatter3.set_array(self.intensity)
+        self.scatter4.set_array(self.intensity)
+
+    def start(self):
+        self.ax1.set_xlabel("x", size=12)
+        self.ax1.set_ylabel("px", size=12)
+        self.ax2.set_xlabel("y", size=12)
+        self.ax2.set_ylabel("py", size=12)
+        self.ax3.set_xlabel("dt", size=12)
+        self.ax3.set_ylabel("p", size=12)
+        self.ax4.set_xlabel("x", size=12)
+        self.ax4.set_ylabel("y", size=12)
+
+        self.ax1.grid()
+        self.ax2.grid()
+        self.ax3.grid()
+        self.ax4.grid()
+
+        colors = [[0, 0, 1, 0], [0, 0, 1, 0.5], [0, 0.2, 0.4, 1]]
+        cmap = LinearSegmentedColormap.from_list("", colors)
+
+        self.xlimlist = [(xmin, xmax), (ymin, ymax), (tmin, tmax), (xmin, xmax)]
+        self.ylimlist = [(pxmin, pxmax), (pymin, pymax), (pmin, pmax), (ymin, ymax)]
+
+        # set axes limits if not zero
+        for j, ax in enumerate([self.ax1, self.ax2, self.ax3, self.ax4]):
+            if xlimlist[j][0] != xlimlist[j][1]:
+                ax.set_xlim(xlimlist[j][0], xlimlist[j][1])
+            if ylimlist[j][0] != ylimlist[j][1]:
+                ax.set_ylim(ylimlist[j][0], ylimlist[j][1])
+
+        self.scatter1 = self.ax1.scatter(self.x, self.px, s=2, c=[], cmap=cmap, vmin=0, vmax=1)
+        self.scatter2 = self.ax2.scatter(self.y, self.py, s=2, c=[], cmap=cmap, vmin=0, vmax=1)
+        self.scatter3 = self.ax3.scatter(self.dt, self.pt, s=2, c=[], cmap=cmap, vmin=0, vmax=1)
+        self.scatter4 = self.ax4.scatter(self.x, self.y, s=2, c=[], cmap=cmap, vmin=0, vmax=1)
+
+        self.anim = matplotlib.animation.FuncAnimation(
+            self.fig, self.animate, frames=self.t, interval=10, repeat=False, blit=True
+        )
+        plt.show()
