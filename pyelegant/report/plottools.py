@@ -350,8 +350,18 @@ class ParticleAnimation6D:
         colors = [[0, 0, 1, 0], [0, 0, 1, 0.5], [0, 0.2, 0.4, 1]]
         cmap = LinearSegmentedColormap.from_list("", colors)
 
-        self.xlimlist = [(xmin, xmax), (ymin, ymax), (tmin, tmax), (xmin, xmax)]
-        self.ylimlist = [(pxmin, pxmax), (pymin, pymax), (pmin, pmax), (ymin, ymax)]
+        self.xlimlist = [
+            (self.xmin, self.xmax),
+            (self.ymin, self.ymax),
+            (self.tmin, self.tmax),
+            (self.xmin, self.xmax),
+        ]
+        self.ylimlist = [
+            (self.pxmin, self.pxmax),
+            (self.pymin, self.pymax),
+            (self.ptmin, self.ptmax),
+            (self.ymin, self.ymax),
+        ]
 
         # set axes limits if not zero
         for j, ax in enumerate([self.ax1, self.ax2, self.ax3, self.ax4]):
