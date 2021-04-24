@@ -455,3 +455,39 @@ def format_axes(ax):
         axis.set_tick_params(direction="out", color=SPINE_COLOR)
 
     return ax
+
+
+def PlotTrackingTSA(
+    data, nturns, npart, col="x", auto=True, vmax=250, vmin=-150, save=False, fn=None, **kwargs
+):
+    import matplotlib.ticker as ticker
+
+    x = pdata[col].values.copy()
+    x = x.reshape(2000, 24)
+
+    if auto:
+        norm = plt.cm.colors.Normalize(vmax=x.max(), vmin=x.min())
+    else:
+        norm = plt.cm.colors.Normalize(vmax=vmax, vmin=vmin)
+
+    plt.figure(figsize=(12, 8))
+    # be carefull - this is normalized to actual see a signal
+    plt.imshow(abs(np.fft.rfft(x, axis=0)), aspect="auto", norm=norm)
+    ticks_y = ticker.FuncFormatter(lambda x, pos: "{0:g}".format(x / 2000))
+    plt.gca().yaxis.set_major_formatter(ticks_y)
+
+    plt.grid()
+    plt.xlabel("ParticleID")
+    plt.ylabel(r"$\nu_{frac}$")
+
+    xlim = kwargs.get("xlim", None)
+    ylim = kwargs.get("ylim", None)
+
+    if xlim is not None:
+        plt.xlim(xlim)
+    if ylim is not None:
+        print(ylim)
+        plt.ylim(tuple(np.array(ylim) * nturns))
+
+    if save:
+        plt.savefig(fn)
