@@ -1,10 +1,20 @@
+import fractions as frac
+import math
+import os
+from pathlib import Path
+
+import dask.delayed as delay
 import matplotlib
 import matplotlib.animation as animation
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import seaborn as sns
+from dask import dataframe as dd
+from matplotlib import cm
 from matplotlib.animation import FuncAnimation
 from matplotlib.colors import LinearSegmentedColormap
+from tqdm import tqdm
 
 
 class PhaseSpaceAnimation:
@@ -491,3 +501,246 @@ def PlotTrackingTSA(
 
     if save:
         plt.savefig(fn)
+
+
+def updateOrder(lines, leftY, rightY, order, label):
+    if leftY in lines:
+        if (rightY in lines[leftY]) and (lines[leftY][rightY]["order"] < order):
+            lines[leftY][rightY] = {"order": order, "label": label}
+        else:
+            lines[leftY][rightY] = {"order": order, "label": label}
+    else:
+        lines[leftY] = {}
+        lines[leftY][rightY] = {"order": order, "label": label}
+
+
+def farey_gen(N):
+    """a generator to produce the ascending Farey sequence of order N,
+    according to the algorithm described on
+    http://en.wikipedia.org/wiki/Farey_sequence#Next_term"""
+
+    a, b, c, d = 0, 1, 1, N
+    yield frac.Fraction(a, b)
+    while float(c) / d <= 1:
+        k = (N + b) // d
+        a, c = c, k * c - a
+        b, d = d, k * d - b
+        yield frac.Fraction(a, b)
+
+
+def simplify(f1, f2, f3):
+    """simplify the linear equation
+    f1*x + f2*y + f3 = 0
+    to
+    a*x + b*y + c = 0,
+    where f1, f2 and f3 are irreducible fractions,
+    a, b and c are coprime integers"""
+
+    def lcd(a, b, c):
+        """lowest common denominator of three integers"""
+        d = a * b // math.gcd(a, b)
+        return c * d // math.gcd(c, d)
+
+    def gcd(a, b, c):
+        """greatest common divisor of three integers"""
+        d = math.gcd(a, b)
+        return math.gcd(c, d)
+
+    d = frac.Fraction(lcd(f1.denominator, f2.denominator, f3.denominator))
+
+    a = (f1 * d).numerator
+    b = (f2 * d).numerator
+    c = (f3 * d).numerator
+    d = gcd(a, b, c)
+    return a / d, b / d
+
+
+def sibling(line):
+    """find all the sibling of a line segment which have symmetric relation
+    about the following axes: x = 1/2 or/and y = 1/2.
+    The known line is given by a pair of points (4 coordinates).
+    This function returns a set of point-pairs defining the related lines."""
+
+    lines = set([line])
+    x1, y1, x2, y2 = line
+    lines.add((1 - x1, y1, 1 - x2, y2))
+    lines.add((x2, 1 - y2, x1, 1 - y1))
+    lines.add((1 - x2, 1 - y2, 1 - x1, 1 - y1))
+    return lines
+
+
+def generatelines(N, ax=None, freq=False, ref_freq=0):
+    # N = int(raw_input("specify the order of the resonance: ")) # python3 -> input
+    #     ax1.clear()
+    if ax is None:
+        traces = []
+
+    N = int(N)
+    if N > 0:
+        Orders = range(1, N + 1)
+        fareys = [[] for x in Orders]
+        lines = [set() for x in Orders]
+
+    for Ni in range(len(Orders)):
+
+        fareys[Ni] = [f for f in farey_gen(Orders[Ni])]
+        lines[Ni] = set()
+
+        # select line segments which belong to resonance of order N
+        for i, f1 in enumerate(fareys[Ni]):  # 0 <= f1 <= 1
+            lines[Ni].add((f1, 0, f1, 1))  # vertical line
+            lines[Ni].add((0, f1, 1, f1))  # horizontal line
+            if f1 > 0 and 2 * f1.denominator <= Orders[Ni]:  # diagonal line, e.g. x + y - f1 = 0
+                lines[Ni] = lines[Ni].union(sibling((f1, 0, 0, f1)))
+
+            for f2 in fareys[Ni][1:i]:  # 0 < f2 < f1
+                a, b = simplify(1, abs(f2 - f1), f1)
+                if a + b <= Orders[Ni]:  # e.g. x + (f2-f1)*y - f1 = 0
+                    lines[Ni] = lines[Ni].union(sibling((f1, 0, f2, 1)))
+                    lines[Ni] = lines[Ni].union(sibling((1, f2, 0, f1)))  # flip about y = x
+
+                a, b = simplify(f2, f1, f1 * f2)
+                if a + b <= Orders[Ni]:  # e.g. f2*x + f1*y - f1*f2 = 0
+                    lines[Ni] = lines[Ni].union(sibling((f1, 0, 0, f2)))
+                    lines[Ni] = lines[Ni].union(sibling((f2, 0, 0, f1)))  # flip about y = x
+
+    lines = list(reversed(lines))
+
+    if len(lines) > 1:
+        for i in range(len(lines) - 1):
+            lines[i] = lines[i].difference(lines[i + 1])
+
+    Ncount = 1
+    linecolors = ["cyan", "red", "magenta", "blue", "green"]
+    linecolors = plt.cm.tab10(np.linspace(0, 1, 10))
+
+    if ax is None:
+        linecolors = [
+            "#1f77b4",  # muted blue
+            "#ff7f0e",  # safety orange
+            "#2ca02c",  # cooked asparagus green
+            "#d62728",  # brick red
+            "#9467bd",  # muted purple
+            "#8c564b",  # chestnut brown
+            "#e377c2",  # raspberry yogurt pink
+            "#7f7f7f",  # middle gray
+            "#bcbd22",  # curry yellow-green
+            "#17becf",  # blue-teal
+        ]
+
+    if freq:
+        for i, x in enumerate(list(reversed(lines))):
+            while x:
+                x1, y1, x2, y2 = x.pop()
+                if Ncount > 10:
+                    if not ax is None:
+                        ax.plot(
+                            [x1 * ref_freq, x2 * ref_freq],
+                            [y1 * ref_freq, y2 * ref_freq],
+                            linewidth=np.divide(7, Ncount),
+                            color="black",
+                            alpha=0.5,
+                        )
+                    else:
+                        traces.append(
+                            dict(
+                                type="scatter",
+                                x=[x1 * ref_freq, x2 * ref_freq],
+                                y=[y1 * ref_freq, y2 * ref_freq],
+                                line=dict(color="black", width=np.divide(7, Ncount)),
+                                showlegend=False,
+                                opacity=0.5,
+                            )
+                        )
+                else:
+                    if not ax is None:
+                        ax.plot(
+                            [x1 * ref_freq, x2 * ref_freq],
+                            [y1 * ref_freq, y2 * ref_freq],
+                            linewidth=np.divide(7, Ncount),
+                            alpha=0.5,
+                            color=linecolors[Ncount - 1],
+                        )
+                    else:
+                        traces.append(
+                            dict(
+                                type="scatter",
+                                x=[x1 * ref_freq, x2 * ref_freq],
+                                y=[y1 * ref_freq, y2 * ref_freq],
+                                line=dict(
+                                    color=linecolors[Ncount - 1], width=np.divide(7, Ncount)
+                                ),
+                                showlegend=False,
+                                opacity=0.5,
+                            )
+                        )
+            Ncount += 1
+    else:
+        for i, x in enumerate(list(reversed(lines))):
+            while x:
+                x1, y1, x2, y2 = x.pop()
+                x1 = float(x1)
+                y1 = float(y1)
+                x2 = float(x2)
+                y2 = float(y2)
+                if Ncount > 10:
+                    if not ax is None:
+                        ax.plot(
+                            [x1, x2],
+                            [y1, y2],
+                            linewidth=np.divide(7, Ncount),
+                            alpha=0.5,
+                            color="black",
+                        )
+                    else:
+                        traces.append(
+                            dict(
+                                type="scatter",
+                                x=[x1, x2],
+                                y=[y1, y2],
+                                line=dict(color="black", alpha=0.5, width=np.divide(7, Ncount)),
+                                showlegend=False,
+                                opacity=0.5,
+                            )
+                        )
+                else:
+                    if not ax is None:
+                        ax.plot(
+                            [x1, x2],
+                            [y1, y2],
+                            linewidth=np.divide(7, Ncount),
+                            alpha=0.5,
+                            color=f"rgba({tuple(linecolors[Ncount - 1])}",
+                        )
+                    else:
+                        traces.append(
+                            dict(
+                                type="scatter",
+                                x=[x1, x2],
+                                y=[y1, y2],
+                                line=dict(
+                                    color=linecolors[Ncount - 1], width=np.divide(7, Ncount)
+                                ),
+                                showlegend=False,
+                                opacity=0.5,
+                            )
+                        )
+
+            Ncount += 1
+    if ax is None:
+        return traces
+
+
+class OOMFormatter(matplotlib.ticker.ScalarFormatter):
+    def __init__(self, order=0, fformat="%1.1f", offset=True, mathText=True):
+        self.oom = order
+        self.fformat = fformat
+        matplotlib.ticker.ScalarFormatter.__init__(self, useOffset=offset, useMathText=mathText)
+
+    def _set_orderOfMagnitude(self, nothing):
+        self.orderOfMagnitude = self.oom
+
+    def _set_format(self):
+        self.format = self.fformat
+        if self._useMathText:
+            self.format = "$%s$" % matplotlib.ticker._mathdefault(self.format)
