@@ -365,10 +365,10 @@ class ParticleAnimation6D:
 
         # set axes limits if not zero
         for j, ax in enumerate([self.ax1, self.ax2, self.ax3, self.ax4]):
-            if xlimlist[j][0] != xlimlist[j][1]:
-                ax.set_xlim(xlimlist[j][0], xlimlist[j][1])
+            if self.xlimlist[j][0] != self.xlimlist[j][1]:
+                ax.set_xlim(xlimlist[j][0], self.xlimlist[j][1])
             if ylimlist[j][0] != ylimlist[j][1]:
-                ax.set_ylim(ylimlist[j][0], ylimlist[j][1])
+                ax.set_ylim(ylimlist[j][0], self.ylimlist[j][1])
 
         self.scatter1 = self.ax1.scatter(self.x, self.px, s=2, c=[], cmap=cmap, vmin=0, vmax=1)
         self.scatter2 = self.ax2.scatter(self.y, self.py, s=2, c=[], cmap=cmap, vmin=0, vmax=1)
