@@ -9,7 +9,8 @@ import matplotlib.animation as animation
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import seaborn as sns
+
+# import seaborn as sns
 from dask import dataframe as dd
 from matplotlib import cm
 from matplotlib.animation import FuncAnimation
