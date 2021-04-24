@@ -5,106 +5,80 @@ from matplotlib.animation import FuncAnimation
 from matplotlib.colors import LinearSegmentedColormap
 
 
-def ani(data, nmax, save=False, fn="test2.mp4"):
-    import matplotlib
-    import matplotlib.animation as animation
-    import matplotlib.pyplot as plt
-    from matplotlib.animation import FuncAnimation
-    from matplotlib.colors import BoundaryNorm, LinearSegmentedColormap, ListedColormap
+class PhaseSpaceAnimation:
+    """Class to generate phase-space animation"""
 
-    Writer = animation.writers["ffmpeg"]
-    writer = Writer(fps=24, metadata=dict(artist="Me"), bitrate=1800)
+    def __init__(self, data, nmax, xcol="x", pcol="xp"):
+        self.data = data.reset_index()
+        self.nmax = nmax
+        self.fig = plt.figure(figsize=(8, 8))
+        self.ax = plt.subplot2grid((2, 2), (0, 0), rowspan=2, colspan=2)
+        self.xmin = 1.1 * data[xcol].min()
+        self.pmin = 1.1 * data[pcol].min()
+        self.xmax = 1.1 * data[xcol].max()
+        self.pmax = 1.1 * data[pcol].max()
+        self.x = []
+        self.p = []
+        self.intensity = []
+        self.iterations = len(data)
+        self.t = list(range(nmax))
+        self.xcol = xcol
+        self.pcol = pcol
 
-    xmin = 1.1 * data["x"].min()
-    pxmin = 1.1 * data["xp"].min()
-    xmax = 1.1 * data["x"].max()
-    pxmax = 1.1 * data["xp"].max()
-
-    xlimlist = [(xmin, xmax)]
-    ylimlist = [(pxmin, pxmax)]
-
-    # init variables to store plot data
-    x_vals = []
-    px_vals = []
-
-    intensity = []
-    intensityp = []
-    iterations = len(data)
-
-    # init frame steps
-    t_vals = list(range(nmax))
-
-    # plot setup
-    fig = plt.figure(figsize=(8, 8))
-
-    ax1 = plt.subplot2grid((2, 2), (0, 0), rowspan=2, colspan=2)
-    ax1.set_xlabel("x", size=12)
-    ax1.set_ylabel("px", size=12)
-    ax1.grid()
-
-    colors = [[0, 0, 1, 0], [0, 0, 1, 0.5], [0, 0.2, 0.4, 1]]
-    cmap = LinearSegmentedColormap.from_list("", colors)
-
-    #     colors = ["blue","green",'orange','red']
-    # init plots
-    scatter1 = ax1.scatter(x_vals, px_vals, s=2, c=[], cmap=cmap, vmin=0, vmax=1)
-
-    def get_new_vals(t):
+    def get_new_vals(self, t):
         """
         Method to get data
         updates.
         """
-        x = [data["x"].iloc[t]]
-        px = [data["xp"].iloc[t]]
+        x = [self.data[self.xcol].iloc[t + 1]]
+        p = [self.data[self.pcol].iloc[t + 1]]
 
-        return list(x), list(px)
+        return list(x), list(p)
 
-    def get_colour(t):
-        cmap = matplotlib.cm.get_cmap("Spectral")
-        return cmap(t % 1.0)
+    def animate(self, i):
+        self.ax.set_title(f"Turn: {i:3}")
+        #         self.x = self.data.loc[:i,self.xcol].values
+        #         self.p = self.data.loc[:i,self.pcol].values
 
-    def update(t):
-        """
-        Update the data storage
-        variable, intensity and color.
-        """
-        global x_vals, px_vals, intensity, intensityp
-
-        # Get intermediate points
-        new_xvals, new_pxvals = get_new_vals(t)
-        x_vals.extend(new_xvals)
-        px_vals.extend(new_pxvals)
+        new_xvals, new_pxvals = self.get_new_vals(i)
+        self.x.extend(new_xvals)
+        self.p.extend(new_pxvals)
 
         # Put new values in your plot
-        scatter1.set_offsets(np.c_[x_vals, px_vals])
+        self.scatter.set_offsets(np.c_[self.x, self.p])
 
         # calculate new color values
-        intensity = np.concatenate((np.array(intensity) * 0.98, np.ones(len(new_xvals))))
-        intensityp = np.concatenate((np.array(intensityp) * 0.99, np.ones(len(new_xvals))))
+        self.intensity = np.concatenate((np.array(self.intensity) * 0.99, np.ones(1)))
 
-        # update color variables
-        scatter1.set_array(intensity)
+        self.scatter.set_array(self.intensity)
 
-        #         scatter1.set_color([colors[t % 4]])
+    #         return self.scatter,
 
-        # Set title to show turn number
+    def start(self):
+        #         Writer = animation.writers['ffmpeg']
+        #         writer = Writer(fps=24, metadata=dict(artist='Me'), bitrate=1800)
+        self.ax.set_xlabel("x", size=12)
+        self.ax.set_ylabel("px", size=12)
+        self.ax.grid()
 
-        ax1.set_title(f"Turn: {t:3}")
-        ax1.set_xlim(xlimlist[0][0], xlimlist[0][1])
-        ax1.set_ylim(ylimlist[0][0], ylimlist[0][1])
+        colors = [[0, 0, 1, 0], [0, 0, 1, 0.5], [0, 0.2, 0.4, 1]]
+        cmap = LinearSegmentedColormap.from_list("", colors)
 
-    # create the animation
-    ani = matplotlib.animation.FuncAnimation(
-        fig, update, frames=t_vals, interval=10, repeat=False, blit=True
-    )
+        self.xlimlist = [(self.xmin, self.xmax)]
+        self.ylimlist = [(self.pmin, self.pmax)]
 
-    # saving ?
-    if save:
-        ani.save(fn)
+        self.scatter = self.ax.scatter(self.x, self.p, s=2, c=[], cmap=cmap, vmin=0, vmax=1)
+        self.ax.set_xlim(self.xlimlist[0][0], self.xlimlist[0][1])
+        self.ax.set_ylim(self.ylimlist[0][0], self.ylimlist[0][1])
+        self.anim = matplotlib.animation.FuncAnimation(
+            self.fig, self.animate, frames=self.t, interval=10, repeat=False, blit=True
+        )
+        plt.show()
 
-    plt.tight_layout()
-    plt.show()
-    return ani
+    def save(self, fn):
+        if self.anim is None:
+            self.start()
+        self.anim.save(fn)
 
 
 def make_movie(data6d, particleID, maxturn, save=False, filename="test.mp4", plotranges=None):
