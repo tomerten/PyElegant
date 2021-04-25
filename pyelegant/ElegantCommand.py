@@ -107,7 +107,8 @@ class ElegantCommandFile:
 
         # add command parameters to the command dict
         for k, v in params.items():
-            thiscom[k] = v
+            if v != "":
+                thiscom[k] = v
 
         # add the command dict to the command list
         self.commandlist.append(thiscom)
