@@ -209,8 +209,9 @@ class ElegantRun:
 
     def add_watch_at_start(self):
         self.add_watch(
+            name="W",
             add_at_start=1,
-            element_def='W: WATCH, FILENAME="%s-%03ld.wq", mode=coordinates',
+            element_def='W: WATCH, FILENAME="%s-%03ld.wq", mode="coordinates"',
         )
 
     def add_fma_command(self, **kwargs):
