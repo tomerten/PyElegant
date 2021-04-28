@@ -208,8 +208,10 @@ class SDDS:
         """
         Run all the sddscommands in the command list.
         """
+        print(self.commandlist)
         if len(self.commandlist) > 0:
             for cmd in range(len(self.commandlist)):
+                print(cmd)
                 # add commands to history
                 self._addHistory(cmd)
 
