@@ -291,6 +291,7 @@ class SDDS:
                 self.filename.split(".")[0], self.filename.split(".")[1]
             ),
         )
+        print(self.commandlist)
         self.runCommand()
 
         # cmdstr = "{} sddsprocess -define=column,step,Step {} {}_processed.{}".format(
