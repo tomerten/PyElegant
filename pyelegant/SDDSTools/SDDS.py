@@ -211,6 +211,7 @@ class SDDS:
         print(self.commandlist)
         if len(self.commandlist) > 0:
             for cmd in self.commandlist:
+                print(self.commandlist[0])
                 print(cmd)
                 # add commands to history
                 self._addHistory(cmd)
